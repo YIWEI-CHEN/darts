@@ -60,12 +60,12 @@ class Cutout(object):
 
 
 def _data_transforms_cifar10(args):
-  CIFAR_MEAN = [0.49139968, 0.48215827, 0.44653124]
-  CIFAR_STD = [0.24703233, 0.24348505, 0.26158768]
+  CIFAR_MEAN = [x / 255 for x in [125.3, 123.0, 113.9]]  # [0.49139968, 0.48215827, 0.44653124]
+  CIFAR_STD = [x / 255 for x in [63.0, 62.1, 66.7]]  # [0.24703233, 0.24348505, 0.26158768]
 
   train_transform = transforms.Compose([
-    transforms.RandomCrop(32, padding=4),
     transforms.RandomHorizontalFlip(),
+    transforms.RandomCrop(32, padding=4),
     transforms.ToTensor(),
     transforms.Normalize(CIFAR_MEAN, CIFAR_STD),
   ])
@@ -119,3 +119,17 @@ def create_exp_dir(path, scripts_to_save=None):
       dst_file = os.path.join(path, 'scripts', os.path.basename(script))
       shutil.copyfile(script, dst_file)
 
+
+class RobustLogLoss(torch.nn.Module):
+    def __init__(self, alpha=0.1):
+        super(RobustLogLoss, self).__init__()
+        self.alpha = alpha
+
+    def forward(self, input, target):
+        target_one_hot = Variable(torch.zeros(input.size()), requires_grad=False).cuda(async=True)
+        indices = Variable(target.data.unsqueeze(-1), requires_grad=False).cuda()
+        target_one_hot = target_one_hot.scatter_(1, indices, 1).float()
+
+        _input = torch.log(self.alpha + torch.nn.functional.softmax(input, dim=1))
+        loss = -target_one_hot * _input + (1 - target_one_hot) * _input / (target_one_hot.shape[1] - 1)
+        return torch.mean(torch.sum(loss, dim=1) + np.log((self.alpha + 1) / self.alpha))

@@ -10,13 +10,13 @@ import argparse
 import torch.nn as nn
 import torch.utils
 import torch.nn.functional as F
-import torchvision.datasets as dset
 import torch.backends.cudnn as cudnn
 
 from torch.autograd import Variable
 from model_search import Network
 from architect import Architect
 
+from load_corrupted_data import CIFAR10
 
 parser = argparse.ArgumentParser("cifar")
 parser.add_argument('--data', type=str, default='../data', help='location of the data corpus')
@@ -41,6 +41,16 @@ parser.add_argument('--train_portion', type=float, default=0.5, help='portion of
 parser.add_argument('--unrolled', action='store_true', default=False, help='use one-step unrolled validation loss')
 parser.add_argument('--arch_learning_rate', type=float, default=3e-4, help='learning rate for arch encoding')
 parser.add_argument('--arch_weight_decay', type=float, default=1e-3, help='weight decay for arch encoding')
+parser.add_argument('--dataset', type=str, default='cifar10', choices=['cifar10', 'cifar100'],
+                    help='Choose between CIFAR-10, CIFAR-100.')
+parser.add_argument('--gold_fraction', '-gf', type=float, default=1, help='What fraction of the data should be trusted?')
+parser.add_argument('--corruption_prob', '-cprob', type=float, default=0.7, help='The label corruption probability.')
+parser.add_argument('--corruption_type', '-ctype', type=str, default='unif',
+                    help='Type of corruption ("unif", "flip", hierarchical).')
+parser.add_argument('--time_limit', type=int, default=12*60*60, help='Time limit for search')
+parser.add_argument('--loss_func', type=str, default='cce', choices=['cce', 'rll'],
+                    help='Choose between Categorical Cross Entropy (CCE), Robust Log Loss (RLL).')
+parser.add_argument('--clean_valid', action='store_true', default=False, help='use clean validation')
 args = parser.parse_args()
 
 args.save = 'search-{}-{}'.format(args.save, time.strftime("%Y%m%d-%H%M%S"))
@@ -66,13 +76,18 @@ def main():
   torch.cuda.set_device(args.gpu)
   cudnn.benchmark = True
   torch.manual_seed(args.seed)
-  cudnn.enabled=True
+  cudnn.enabled = True
   torch.cuda.manual_seed(args.seed)
   logging.info('gpu device = %d' % args.gpu)
   logging.info("args = %s", args)
 
-  criterion = nn.CrossEntropyLoss()
-  criterion = criterion.cuda()
+  if args.loss_func == 'cce':
+    criterion = nn.CrossEntropyLoss().cuda()
+  elif args.loss_func == 'rll':
+    criterion = utils.RobustLogLoss().cuda()
+  else:
+    assert False, "Invalid loss function '{}' given. Must be in {'cce', 'rll'}".format(args.loss_func)
+
   model = Network(args.init_channels, CIFAR_CLASSES, args.layers, criterion)
   model = model.cuda()
   logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
@@ -84,7 +99,23 @@ def main():
       weight_decay=args.weight_decay)
 
   train_transform, valid_transform = utils._data_transforms_cifar10(args)
-  train_data = dset.CIFAR10(root=args.data, train=True, download=True, transform=train_transform)
+
+  # Load dataset
+  if args.gold_fraction == 0:
+    train_data = CIFAR10(
+      root=args.data, train=True, gold=False, gold_fraction=args.gold_fraction,
+      corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
+      transform=train_transform, download=True, seed=args.seed)
+    if args.clean_valid:
+      gold_train_data = CIFAR10(
+        root=args.data, train=True, gold=True, gold_fraction=1.0,
+        corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
+        transform=train_transform, download=True, seed=args.seed)
+  else:
+    train_data = CIFAR10(
+      root=args.data, train=True, gold=True, gold_fraction=args.gold_fraction,
+      corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
+      transform=train_transform, download=True, seed=args.seed)
 
   num_train = len(train_data)
   indices = list(range(num_train))
@@ -95,9 +126,15 @@ def main():
       sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[:split]),
       pin_memory=True, num_workers=2)
 
-  valid_queue = torch.utils.data.DataLoader(
+  if args.clean_valid:
+    valid_queue = torch.utils.data.DataLoader(
+      gold_train_data, batch_size=args.batch_size,
+      sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[split:]),
+      pin_memory=True, num_workers=2)
+  else:
+    valid_queue = torch.utils.data.DataLoader(
       train_data, batch_size=args.batch_size,
-      sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[split:num_train]),
+      sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[split:]),
       pin_memory=True, num_workers=2)
 
   scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
