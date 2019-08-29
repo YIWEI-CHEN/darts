@@ -15,7 +15,7 @@ import torch.backends.cudnn as cudnn
 
 from torch.autograd import Variable
 from model import NetworkCIFAR as Network
-
+from load_corrupted_data import CIFAR10, CIFAR100
 
 parser = argparse.ArgumentParser("cifar")
 parser.add_argument('--data', type=str, default='../data', help='location of the data corpus')
@@ -38,6 +38,15 @@ parser.add_argument('--save', type=str, default='EXP', help='experiment name')
 parser.add_argument('--seed', type=int, default=0, help='random seed')
 parser.add_argument('--arch', type=str, default='DARTS', help='which architecture to use')
 parser.add_argument('--grad_clip', type=float, default=5, help='gradient clipping')
+parser.add_argument('--dataset', type=str, default='cifar10', choices=['cifar10', 'cifar100'],
+                    help='Choose between CIFAR-10, CIFAR-100.')
+parser.add_argument('--gold_fraction', '-gf', type=float, default=1, help='What fraction of the data should be trusted?')
+parser.add_argument('--corruption_prob', '-cprob', type=float, default=0.7, help='The label corruption probability.')
+parser.add_argument('--corruption_type', '-ctype', type=str, default='unif',
+                    help='Type of corruption ("unif", "flip", hierarchical).')
+parser.add_argument('--time_limit', type=int, default=12*60*60, help='Time limit for search')
+parser.add_argument('--loss_func', type=str, default='cce', choices=['cce', 'rll'],
+                    help='Choose between Categorical Cross Entropy (CCE), Robust Log Loss (RLL).')
 args = parser.parse_args()
 
 args.save = 'eval-{}-{}'.format(args.save, time.strftime("%Y%m%d-%H%M%S"))
@@ -50,8 +59,12 @@ fh = logging.FileHandler(os.path.join(args.save, 'log.txt'))
 fh.setFormatter(logging.Formatter(log_format))
 logging.getLogger().addHandler(fh)
 
-CIFAR_CLASSES = 10
-
+if args.dataset == 'cifar10':
+  CIFAR_CLASSES = 10
+elif args.dataset == 'cifar100':
+  CIFAR_CLASSES = 100
+else:
+  CIFAR_CLASSES = 10
 
 def main():
   if not torch.cuda.is_available():
@@ -73,8 +86,12 @@ def main():
 
   logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
 
-  criterion = nn.CrossEntropyLoss()
-  criterion = criterion.cuda()
+  if args.loss_func == 'cce':
+    criterion = nn.CrossEntropyLoss().cuda()
+  elif args.loss_func == 'rll':
+    criterion = utils.RobustLogLoss().cuda()
+  else:
+    assert False, "Invalid loss function '{}' given. Must be in {'cce', 'rll'}".format(args.loss_func)
   optimizer = torch.optim.SGD(
       model.parameters(),
       args.learning_rate,
@@ -83,8 +100,33 @@ def main():
       )
 
   train_transform, valid_transform = utils._data_transforms_cifar10(args)
-  train_data = dset.CIFAR10(root=args.data, train=True, download=True, transform=train_transform)
-  valid_data = dset.CIFAR10(root=args.data, train=False, download=True, transform=valid_transform)
+
+  # valid_data is the test data here
+  if args.dataset == 'cifar10':
+    if args.gold_fraction == 0:
+      train_data = CIFAR10(
+        root=args.data, train=True, gold=False, gold_fraction=args.gold_fraction,
+        corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
+        transform=train_transform, download=True, seed=args.seed)
+    else:
+      train_data = CIFAR10(
+        root=args.data, train=True, gold=True, gold_fraction=args.gold_fraction,
+        corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
+        transform=train_transform, download=True, seed=args.seed)
+    valid_data = dset.CIFAR10(root=args.data, train=False, download=True, transform=valid_transform)
+
+  elif args.dataset == 'cifar100':
+    if args.gold_fraction == 0:
+      train_data = CIFAR100(
+        root=args.data, train=True, gold=False, gold_fraction=args.gold_fraction,
+        corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
+        transform=train_transform, download=True, seed=args.seed)
+    else:
+      train_data = CIFAR100(
+        root=args.data, train=True, gold=True, gold_fraction=args.gold_fraction,
+        corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
+        transform=train_transform, download=True, seed=args.seed)
+    valid_data = dset.CIFAR100(root=args.data, train=False, download=True, transform=valid_transform)
 
   train_queue = torch.utils.data.DataLoader(
       train_data, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=2)
