@@ -47,6 +47,7 @@ parser.add_argument('--corruption_type', '-ctype', type=str, default='unif',
 parser.add_argument('--time_limit', type=int, default=12*60*60, help='Time limit for search')
 parser.add_argument('--loss_func', type=str, default='cce', choices=['cce', 'rll'],
                     help='Choose between Categorical Cross Entropy (CCE), Robust Log Loss (RLL).')
+parser.add_argument('--alpha', type=float, default=0.1, help='alpha for RLL')
 args = parser.parse_args()
 
 args.save = 'eval-{}-{}'.format(args.save, time.strftime("%Y%m%d-%H%M%S"))
@@ -89,7 +90,7 @@ def main():
   if args.loss_func == 'cce':
     criterion = nn.CrossEntropyLoss().cuda()
   elif args.loss_func == 'rll':
-    criterion = utils.RobustLogLoss().cuda()
+    criterion = utils.RobustLogLoss(alpha=args.alpha).cuda()
   else:
     assert False, "Invalid loss function '{}' given. Must be in {'cce', 'rll'}".format(args.loss_func)
   optimizer = torch.optim.SGD(
