@@ -133,3 +133,17 @@ class RobustLogLoss(torch.nn.Module):
         _input = torch.log(self.alpha + torch.nn.functional.softmax(input, dim=1))
         loss = -target_one_hot * _input + (1 - target_one_hot) * _input / (target_one_hot.shape[1] - 1)
         return torch.mean(torch.sum(loss, dim=1) + np.log((self.alpha + 1) / self.alpha))
+
+class ForwardGoldLoss(torch.nn.Module):
+    def __init__(self, corruption_matrix):
+        super(ForwardGoldLoss, self).__init__()
+        self.corruption_matrix = Variable(torch.FloatTensor(corruption_matrix), requires_grad=False).cuda()
+
+    def forward(self, input, target):
+        target_one_hot = Variable(torch.zeros(input.size()), requires_grad=False).cuda(async=True)
+        indices = Variable(target.data.unsqueeze(-1), requires_grad=False).cuda()
+        target_one_hot = target_one_hot.scatter_(1, indices, 1).float()
+
+        _input = torch.mm(torch.nn.functional.softmax(input, dim=1), self.corruption_matrix)
+        loss = target_one_hot * _input
+        return -torch.mean(torch.log(torch.sum(loss, dim=1)))

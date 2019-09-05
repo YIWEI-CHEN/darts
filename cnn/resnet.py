@@ -45,7 +45,7 @@ parser.add_argument('--corruption_prob', '-cprob', type=float, default=0.7, help
 parser.add_argument('--corruption_type', '-ctype', type=str, default='unif',
                     help='Type of corruption ("unif", "flip", hierarchical).')
 parser.add_argument('--time_limit', type=int, default=12 * 60 * 60, help='Time limit for search')
-parser.add_argument('--loss_func', type=str, default='cce', choices=['cce', 'rll'],
+parser.add_argument('--loss_func', type=str, default='cce', choices=['cce', 'rll', 'forward_gold'],
                     help='Choose between Categorical Cross Entropy (CCE), Robust Log Loss (RLL).')
 args = parser.parse_args()
 
@@ -150,12 +150,6 @@ def main():
 
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
 
-    if args.loss_func == 'cce':
-        criterion = nn.CrossEntropyLoss().cuda()
-    elif args.loss_func == 'rll':
-        criterion = utils.RobustLogLoss().cuda()
-    else:
-        assert False, "Invalid loss function '{}' given. Must be in {'cce', 'rll'}".format(args.loss_func)
     optimizer = torch.optim.SGD(
         model.parameters(),
         args.learning_rate,
@@ -195,6 +189,16 @@ def main():
 
     valid_queue = torch.utils.data.DataLoader(
         valid_data, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=2)
+
+    if args.loss_func == 'cce':
+        criterion = nn.CrossEntropyLoss().cuda()
+    elif args.loss_func == 'rll':
+        criterion = utils.RobustLogLoss().cuda()
+    elif args.loss_func == 'forward_gold':
+        corruption_matrix = train_data.corruption_matrix
+        criterion = utils.ForwardGoldLoss(corruption_matrix=corruption_matrix)
+    else:
+        assert False, "Invalid loss function '{}' given. Must be in {'cce', 'rll'}".format(args.loss_func)
 
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, float(args.epochs))
     for epoch in range(args.epochs):
