@@ -14,6 +14,8 @@ import torchvision.datasets as dset
 import torch.backends.cudnn as cudnn
 
 from torch.autograd import Variable
+
+from resnet import ResNet18
 from model import NetworkCIFAR as Network
 from load_corrupted_data import CIFAR10, CIFAR100
 
@@ -48,6 +50,7 @@ parser.add_argument('--time_limit', type=int, default=12*60*60, help='Time limit
 parser.add_argument('--loss_func', type=str, default='cce', choices=['cce', 'rll', 'forward_gold'],
                     help='Choose between Categorical Cross Entropy (CCE), Robust Log Loss (RLL).')
 parser.add_argument('--alpha', type=float, default=0.1, help='alpha for RLL')
+parser.add_argument('--train_portion', type=float, default=0.5, help='portion of training data')
 args = parser.parse_args()
 
 args.save = 'eval-{}-{}'.format(args.save, time.strftime("%Y%m%d-%H%M%S"))
@@ -81,9 +84,13 @@ def main():
   logging.info('gpu device = %d' % args.gpu)
   logging.info("args = %s", args)
 
-  genotype = eval("genotypes.%s" % args.arch)
-  model = Network(args.init_channels, CIFAR_CLASSES, args.layers, args.auxiliary, genotype)
-  model = model.cuda()
+  if args.arch == 'resnet':
+    model = ResNet18(CIFAR_CLASSES).cuda()
+    args.auxiliary = False
+  else:
+    genotype = eval("genotypes.%s" % args.arch)
+    model = Network(args.init_channels, CIFAR_CLASSES, args.layers, args.auxiliary, genotype)
+    model = model.cuda()
 
   logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
 
@@ -94,9 +101,8 @@ def main():
       weight_decay=args.weight_decay
       )
 
-  train_transform, valid_transform = utils._data_transforms_cifar10(args)
+  train_transform, test_transform = utils._data_transforms_cifar10(args)
 
-  # valid_data is the test data here
   if args.dataset == 'cifar10':
     if args.gold_fraction == 0:
       train_data = CIFAR10(
@@ -108,7 +114,7 @@ def main():
         root=args.data, train=True, gold=True, gold_fraction=args.gold_fraction,
         corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
         transform=train_transform, download=True, seed=args.seed)
-    valid_data = dset.CIFAR10(root=args.data, train=False, download=True, transform=valid_transform)
+    test_data = dset.CIFAR10(root=args.data, train=False, download=True, transform=test_transform)
 
   elif args.dataset == 'cifar100':
     if args.gold_fraction == 0:
@@ -121,13 +127,24 @@ def main():
         root=args.data, train=True, gold=True, gold_fraction=args.gold_fraction,
         corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
         transform=train_transform, download=True, seed=args.seed)
-    valid_data = dset.CIFAR100(root=args.data, train=False, download=True, transform=valid_transform)
+    test_data = dset.CIFAR100(root=args.data, train=False, download=True, transform=test_transform)
+
+  num_train = len(train_data)
+  indices = list(range(num_train))
+  split = int(np.floor(args.train_portion * num_train))
 
   train_queue = torch.utils.data.DataLoader(
-      train_data, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=2)
+    train_data, batch_size=args.batch_size,
+    sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[:split]),
+    pin_memory=True, num_workers=2)
 
   valid_queue = torch.utils.data.DataLoader(
-      valid_data, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=2)
+    train_data, batch_size=args.batch_size,
+    sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[split:]),
+    pin_memory=True, num_workers=2)
+
+  test_queue = torch.utils.data.DataLoader(
+      test_data, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=2)
 
   scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, float(args.epochs))
 
@@ -149,8 +166,11 @@ def main():
     train_acc, train_obj = train(train_queue, model, criterion, optimizer)
     logging.info('train_acc %f', train_acc)
 
-    valid_acc, valid_obj = infer(valid_queue, model, criterion)
+    valid_acc, valid_obj = infer_valid(valid_queue, model, criterion)
     logging.info('valid_acc %f', valid_acc)
+
+    test_acc, test_obj = infer(test_queue, model, criterion)
+    logging.info('test_acc %f', test_acc)
 
     utils.save(model, os.path.join(args.save, 'weights.pt'))
 
@@ -187,7 +207,7 @@ def train(train_queue, model, criterion, optimizer):
   return top1.avg, objs.avg
 
 
-def infer(valid_queue, model, criterion):
+def infer_valid(valid_queue, model, criterion):
   objs = utils.AvgrageMeter()
   top1 = utils.AvgrageMeter()
   top5 = utils.AvgrageMeter()
@@ -208,6 +228,31 @@ def infer(valid_queue, model, criterion):
 
     if step % args.report_freq == 0:
       logging.info('valid %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)
+
+  return top1.avg, objs.avg
+
+
+def infer(test_queue, model, criterion):
+  objs = utils.AvgrageMeter()
+  top1 = utils.AvgrageMeter()
+  top5 = utils.AvgrageMeter()
+  model.eval()
+
+  for step, (input, target) in enumerate(test_queue):
+    input = Variable(input, volatile=True).cuda()
+    target = Variable(target, volatile=True).cuda(async=True)
+
+    logits, _ = model(input)
+    loss = criterion(logits, target)
+
+    prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
+    n = input.size(0)
+    objs.update(loss.data[0], n)
+    top1.update(prec1.data[0], n)
+    top5.update(prec5.data[0], n)
+
+    if step % args.report_freq == 0:
+      logging.info('test %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)
 
   return top1.avg, objs.avg
 

@@ -42,12 +42,25 @@ DATE=`date +%m%d`
 #    --epochs ${EPOCHS} --save ${EXP_PATH} --seed 1 \
 #    --dataset cifar10 --corruption_prob 0.7 --corruption_type unif --gold_fraction 0 --loss_func ${LOSS}
 
-LOSS="forward_gold"
-ARCH="resnet"
-GPU=2
-EXP_PATH="exp/resnet/cifar10_uniform_07_${LOSS}_${ARCH}_gpu${GPU}"
-EPOCHS=600
+#LOSS="forward_gold"
+#ARCH="resnet"
+#GPU=2
+#EXP_PATH="exp/resnet/cifar10_uniform_07_${LOSS}_${ARCH}_gpu${GPU}"
+#EPOCHS=600
+#
+#python resnet.py --data cifar10 --batch_size 64 --learning_rate 0.1 --weight_decay 0.0005 --gpu ${GPU} \
+#    --epochs ${EPOCHS} --save ${EXP_PATH} --seed 1 \
+#    --dataset cifar10 --corruption_prob 0.7 --corruption_type unif --gold_fraction 0 --loss_func ${LOSS}
 
-python resnet.py --data cifar10 --batch_size 64 --learning_rate 0.1 --weight_decay 0.0005 --gpu ${GPU} \
-    --epochs ${EPOCHS} --save ${EXP_PATH} --seed 1 \
-    --dataset cifar10 --corruption_prob 0.7 --corruption_type unif --gold_fraction 0 --loss_func ${LOSS}
+LOSS="rll"
+ARCH="resnet"
+GPU=0
+ALPHA=0.01
+EPOCHS=600
+ETA=0.6
+EXP_PATH="exp/resnet/cifar10_uniform${ETA}_${LOSS}${ALPHA}_gpu${GPU}"
+
+python train.py --data cifar10 --batch_size 64 --gpu ${GPU} \
+    --epochs ${EPOCHS} --save ${EXP_PATH} --seed 1 --cutout \
+    --dataset cifar10 --corruption_prob ${ETA} --corruption_type unif --gold_fraction 0 --loss_func ${LOSS} \
+    --arch ${ARCH} --alpha ${ALPHA} --train_portion 0.9
