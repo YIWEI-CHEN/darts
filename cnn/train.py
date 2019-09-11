@@ -51,6 +51,7 @@ parser.add_argument('--loss_func', type=str, default='cce', choices=['cce', 'rll
                     help='Choose between Categorical Cross Entropy (CCE), Robust Log Loss (RLL).')
 parser.add_argument('--alpha', type=float, default=0.1, help='alpha for RLL')
 parser.add_argument('--train_portion', type=float, default=0.5, help='portion of training data')
+parser.add_argument('--clean_valid', action='store_true', default=False, help='use clean validation')
 args = parser.parse_args()
 
 args.save = 'eval-{}-{}'.format(args.save, time.strftime("%Y%m%d-%H%M%S"))
@@ -109,6 +110,11 @@ def main():
         root=args.data, train=True, gold=False, gold_fraction=args.gold_fraction,
         corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
         transform=train_transform, download=True, seed=args.seed)
+      if args.clean_valid:
+        gold_train_data = CIFAR10(
+          root=args.data, train=True, gold=True, gold_fraction=1.0,
+          corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
+          transform=train_transform, download=True, seed=args.seed)
     else:
       train_data = CIFAR10(
         root=args.data, train=True, gold=True, gold_fraction=args.gold_fraction,
@@ -138,10 +144,16 @@ def main():
     sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[:split]),
     pin_memory=True, num_workers=2)
 
-  valid_queue = torch.utils.data.DataLoader(
-    train_data, batch_size=args.batch_size,
-    sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[split:]),
-    pin_memory=True, num_workers=2)
+  if args.clean_valid:
+    valid_queue = torch.utils.data.DataLoader(
+      gold_train_data, batch_size=args.batch_size,
+      sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[split:]),
+      pin_memory=True, num_workers=2)
+  else:
+    valid_queue = torch.utils.data.DataLoader(
+      train_data, batch_size=args.batch_size,
+      sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[split:]),
+      pin_memory=True, num_workers=2)
 
   test_queue = torch.utils.data.DataLoader(
       test_data, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=2)
