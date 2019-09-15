@@ -108,19 +108,20 @@ DATE=`date +%m%d`
 #    --arch ${ARCH} --alpha ${ALPHA} --layers ${LAYERS}
 
 
-#LOSS="rll"
-#ARCH="CCE_UNIFORM_06"
-#GPU=0
-#ALPHA=0.01
-#EPOCHS=600
-#LAYERS=20
-#ETA=0.6
-#EXP_PATH="exp/MyDARTS/cifar10_${LOSS}${ALPHA}_${ARCH}_gpu${GPU}"
-#
-#python train.py --data cifar10 --batch_size 64 --gpu ${GPU} \
-#    --epochs ${EPOCHS} --save ${EXP_PATH} --seed 1 --auxiliary --cutout \
-#    --dataset cifar10 --corruption_prob ${ETA} --corruption_type unif --gold_fraction 0 --loss_func ${LOSS} \
-#    --arch ${ARCH} --alpha ${ALPHA} --train_portion 0.9
+LOSS="rll"
+ARCH="CCE_UNIFORM_06_SEED_2019"
+GPU=3
+ALPHA=0.01
+EPOCHS=600
+LAYERS=20
+ETA=0.6
+SEED=2019
+EXP_PATH="exp/MyDARTS/cifar10_seed${SEED}_${LOSS}${ALPHA}_${ARCH}_gpu${GPU}"
+
+python train.py --data cifar10 --batch_size 64 --gpu ${GPU} \
+    --epochs ${EPOCHS} --save ${EXP_PATH} --seed ${SEED} --auxiliary --cutout \
+    --dataset cifar10 --corruption_prob ${ETA} --corruption_type unif --gold_fraction 0 --loss_func ${LOSS} \
+    --arch ${ARCH} --alpha ${ALPHA} --train_portion 0.9
 
 #LOSS="rll"
 #ARCH="N3"
@@ -136,15 +137,29 @@ DATE=`date +%m%d`
 #    --dataset cifar10 --corruption_prob ${ETA} --corruption_type unif --gold_fraction 0 --loss_func ${LOSS} \
 #    --arch ${ARCH} --alpha ${ALPHA} --train_portion 0.9 --layers ${LAYERS}
 
-LOSS="cce"
-ARCH="N3"
-GPU=2
-EPOCHS=600
-LAYERS=8
-ETA=0.6
-EXP_PATH="exp/MyDARTS/cifar10_${LOSS}_${ARCH}_gpu${GPU}"
+#LOSS="cce"
+#ARCH="N3"
+#GPU=2
+#EPOCHS=600
+#LAYERS=8
+#ETA=0.6
+#EXP_PATH="exp/MyDARTS/cifar10_${LOSS}_${ARCH}_gpu${GPU}"
+#
+#python train.py --data cifar10 --batch_size 64 --gpu ${GPU} \
+#    --epochs ${EPOCHS} --save ${EXP_PATH} --seed 1 --auxiliary --cutout \
+#    --dataset cifar10 --corruption_prob ${ETA} --corruption_type unif --gold_fraction 0 --loss_func ${LOSS} \
+#    --arch ${ARCH} --train_portion 0.9 --layers ${LAYERS}
 
-python train.py --data cifar10 --batch_size 64 --gpu ${GPU} \
-    --epochs ${EPOCHS} --save ${EXP_PATH} --seed 1 --auxiliary --cutout \
-    --dataset cifar10 --corruption_prob ${ETA} --corruption_type unif --gold_fraction 0 --loss_func ${LOSS} \
-    --arch ${ARCH} --train_portion 0.9 --layers ${LAYERS}
+#LOSS="rll"
+#ARCH="N3"
+#GPU=3
+#ALPHA=0.01
+#EPOCHS=500
+#LAYERS=8
+#ETA=0.6
+#EXP_PATH="exp/MyDARTS/cifar10_clean_valid_${LOSS}${ALPHA}_${ARCH}_gpu${GPU}"
+#
+#python train.py --data cifar10 --batch_size 64 --gpu ${GPU} \
+#    --epochs ${EPOCHS} --save ${EXP_PATH} --seed 1 --auxiliary --cutout \
+#    --dataset cifar10 --corruption_prob ${ETA} --corruption_type unif --gold_fraction 0 --loss_func ${LOSS} \
+#    --arch ${ARCH} --alpha ${ALPHA} --train_portion 0.9 --layers ${LAYERS} --clean_valid
