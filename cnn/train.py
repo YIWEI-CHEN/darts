@@ -15,7 +15,7 @@ import torch.backends.cudnn as cudnn
 
 from torch.autograd import Variable
 
-from resnet import ResNet18
+from resnet import ResNet18, ResNet50, ResNet34
 from model import NetworkCIFAR as Network
 from load_corrupted_data import CIFAR10, CIFAR100
 
@@ -87,6 +87,12 @@ def main():
 
   if args.arch == 'resnet':
     model = ResNet18(CIFAR_CLASSES).cuda()
+    args.auxiliary = False
+  elif args.arch == 'resnet50':
+    model = ResNet50(CIFAR_CLASSES).cuda()
+    args.auxiliary = False
+  elif args.arch == 'resnet34':
+    model = ResNet34(CIFAR_CLASSES).cuda()
     args.auxiliary = False
   else:
     genotype = eval("genotypes.%s" % args.arch)

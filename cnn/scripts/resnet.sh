@@ -53,12 +53,12 @@ DATE=`date +%m%d`
 #    --dataset cifar10 --corruption_prob 0.7 --corruption_type unif --gold_fraction 0 --loss_func ${LOSS}
 
 LOSS="rll"
-ARCH="resnet"
-GPU=0
+ARCH="resnet50"
+GPU=3
 ALPHA=0.01
 EPOCHS=600
 ETA=0.6
-EXP_PATH="exp/resnet/cifar10_uniform${ETA}_${LOSS}${ALPHA}_gpu${GPU}"
+EXP_PATH="exp/resnet/cifar10_uniform${ETA}_${LOSS}${ALPHA}_${ARCH}_gpu${GPU}"
 
 python train.py --data cifar10 --batch_size 64 --gpu ${GPU} \
     --epochs ${EPOCHS} --save ${EXP_PATH} --seed 1 --cutout \
