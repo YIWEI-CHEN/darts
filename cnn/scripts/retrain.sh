@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 DATE=`date +%m%d`
+SEED=1989
 
 #LOSS="rll"
 #ARCH="RLL_UNIFORM_07_EPOCH40"
@@ -176,16 +177,44 @@ DATE=`date +%m%d`
 #    --dataset cifar10 --corruption_prob ${ETA} --corruption_type unif --gold_fraction 0 --loss_func ${LOSS} \
 #    --arch ${ARCH} --train_portion 0.9 --layers ${LAYERS}
 
+#LOSS="rll"
+#ARCH="CHECK_REDUCE_IMPACT"
+#GPU=1
+#ALPHA=0.01
+#EPOCHS=600
+#LAYERS=20
+#ETA=0.6
+#EXP_PATH="exp/handcraft/unif${ETA}_cifar10_${LOSS}${ALPHA}_${ARCH}_gpu${GPU}"
+#
+#python train.py --data cifar10 --batch_size 64 --gpu ${GPU} \
+#    --epochs ${EPOCHS} --save ${EXP_PATH} --seed 1 --auxiliary --cutout \
+#    --dataset cifar10 --corruption_prob ${ETA} --corruption_type unif --gold_fraction 0 --loss_func ${LOSS} \
+#    --arch ${ARCH} --alpha ${ALPHA} --train_portion 0.9 --layers ${LAYERS}
+
+#LOSS="rll"
+##ARCH="CHECK_NORMAL_IMPACT"
+##GPU=2
+##ALPHA=0.01
+##EPOCHS=600
+##LAYERS=20
+##ETA=0.6
+##EXP_PATH="exp/handcraft/unif${ETA}_cifar10_${LOSS}${ALPHA}_${ARCH}_gpu${GPU}"
+##
+##python train.py --data cifar10 --batch_size 64 --gpu ${GPU} \
+##    --epochs ${EPOCHS} --save ${EXP_PATH} --seed 1 --auxiliary --cutout \
+##    --dataset cifar10 --corruption_prob ${ETA} --corruption_type unif --gold_fraction 0 --loss_func ${LOSS} \
+##    --arch ${ARCH} --alpha ${ALPHA} --train_portion 0.9 --layers ${LAYERS}
+
 LOSS="rll"
-ARCH="CHECK_REDUCE_IMPACT"
-GPU=1
+ARCH="DARTS_V2"
+GPU=3
 ALPHA=0.01
 EPOCHS=600
 LAYERS=20
 ETA=0.6
-EXP_PATH="exp/handcraft/unif${ETA}_cifar10_${LOSS}${ALPHA}_${ARCH}_gpu${GPU}"
+EXP_PATH="exp/DARTS/unif_${ETA}_cifar10_seed${SEED}_${LOSS}${ALPHA}_${ARCH}_gpu${GPU}"
 
 python train.py --data cifar10 --batch_size 64 --gpu ${GPU} \
-    --epochs ${EPOCHS} --save ${EXP_PATH} --seed 1 --auxiliary --cutout \
+    --epochs ${EPOCHS} --save ${EXP_PATH} --seed ${SEED} --auxiliary --cutout \
     --dataset cifar10 --corruption_prob ${ETA} --corruption_type unif --gold_fraction 0 --loss_func ${LOSS} \
     --arch ${ARCH} --alpha ${ALPHA} --train_portion 0.9 --layers ${LAYERS}
