@@ -120,3 +120,5 @@ tags
 search-exp/
 .idea/
 cifar10/
+cifar100/
+*.pdf
