@@ -16,7 +16,7 @@ from torch.autograd import Variable
 from model_search import Network
 from architect import Architect
 
-from load_corrupted_data import CIFAR10
+from load_corrupted_data import CIFAR10, CIFAR100
 
 parser = argparse.ArgumentParser("cifar")
 parser.add_argument('--data', type=str, default='../data', help='location of the data corpus')
@@ -64,8 +64,12 @@ fh = logging.FileHandler(os.path.join(args.save, 'log.txt'))
 fh.setFormatter(logging.Formatter(log_format))
 logging.getLogger().addHandler(fh)
 
-
-CIFAR_CLASSES = 10
+if args.dataset == 'cifar10':
+  CIFAR_CLASSES = 10
+elif args.dataset == 'cifar100':
+  CIFAR_CLASSES = 100
+else:
+  CIFAR_CLASSES = 10
 
 
 def main():
@@ -102,22 +106,40 @@ def main():
   train_transform, valid_transform = utils._data_transforms_cifar10(args)
 
   # Load dataset
-  if args.gold_fraction == 0:
-    train_data = CIFAR10(
-      root=args.data, train=True, gold=False, gold_fraction=args.gold_fraction,
-      corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
-      transform=train_transform, download=True, seed=args.seed)
-    if args.clean_valid:
-      gold_train_data = CIFAR10(
-        root=args.data, train=True, gold=True, gold_fraction=1.0,
+  if args.dataset == 'cifar10':
+    if args.gold_fraction == 0:
+      train_data = CIFAR10(
+        root=args.data, train=True, gold=False, gold_fraction=args.gold_fraction,
         corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
         transform=train_transform, download=True, seed=args.seed)
-  else:
-    train_data = CIFAR10(
-      root=args.data, train=True, gold=True, gold_fraction=args.gold_fraction,
-      corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
-      transform=train_transform, download=True, seed=args.seed)
-
+      if args.clean_valid:
+        gold_train_data = CIFAR10(
+          root=args.data, train=True, gold=True, gold_fraction=1.0,
+          corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
+          transform=train_transform, download=True, seed=args.seed)
+    else:
+      train_data = CIFAR10(
+        root=args.data, train=True, gold=True, gold_fraction=args.gold_fraction,
+        corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
+        transform=train_transform, download=True, seed=args.seed)
+      gold_train_data = train_data
+  elif args.dataset == 'cifar100':
+    if args.gold_fraction == 0:
+      train_data = CIFAR100(
+        root=args.data, train=True, gold=False, gold_fraction=args.gold_fraction,
+        corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
+        transform=train_transform, download=True, seed=args.seed)
+      if args.clean_valid:
+        gold_train_data = CIFAR100(
+          root=args.data, train=True, gold=True, gold_fraction=1.0,
+          corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
+          transform=train_transform, download=True, seed=args.seed)
+    else:
+      train_data = CIFAR100(
+        root=args.data, train=True, gold=True, gold_fraction=args.gold_fraction,
+        corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
+        transform=train_transform, download=True, seed=args.seed)
+      gold_train_data = train_data
   num_train = len(train_data)
   indices = list(range(num_train))
   split = int(np.floor(args.train_portion * num_train))
