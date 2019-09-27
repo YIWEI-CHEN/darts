@@ -276,15 +276,43 @@ SEED=1
 #    --arch ${ARCH} --alpha ${ALPHA} --train_portion 0.9 --layers ${LAYERS}
 
 LOSS="rll"
-ARCH="CCE_HIER_06_1"
-GPU=1
+ARCH="RLL001_HIER_04_1"
+GPU=0
 ALPHA=0.01
 EPOCHS=600
 LAYERS=20
-ETA=0.6
+ETA=0.4
 EXP_PATH="exp/MyDARTS/hier_${ETA}_cifar100_seed${SEED}_${LOSS}${ALPHA}_${ARCH}_gpu${GPU}"
 
 python train.py --data cifar100 --batch_size 64 --gpu ${GPU} \
     --epochs ${EPOCHS} --save ${EXP_PATH} --seed ${SEED} --auxiliary --cutout \
     --dataset cifar100 --corruption_prob ${ETA} --corruption_type hierarchical --gold_fraction 0 --loss_func ${LOSS} \
     --arch ${ARCH} --alpha ${ALPHA} --train_portion 0.9 --layers ${LAYERS}
+
+#LOSS="rll"
+#ARCH="CCE_HIER_06_1"
+#GPU=1
+#ALPHA=0.01
+#EPOCHS=600
+#LAYERS=20
+#ETA=0.6
+#EXP_PATH="exp/MyDARTS/hier_${ETA}_cifar100_seed${SEED}_${LOSS}${ALPHA}_${ARCH}_gpu${GPU}"
+#
+#python train.py --data cifar100 --batch_size 64 --gpu ${GPU} \
+#    --epochs ${EPOCHS} --save ${EXP_PATH} --seed ${SEED} --auxiliary --cutout \
+#    --dataset cifar100 --corruption_prob ${ETA} --corruption_type hierarchical --gold_fraction 0 --loss_func ${LOSS} \
+#    --arch ${ARCH} --alpha ${ALPHA} --train_portion 0.9 --layers ${LAYERS}
+
+#LOSS="rll"
+#ARCH="CCE_HIER_04_1"
+#GPU=1
+#ALPHA=0.01
+#EPOCHS=600
+#LAYERS=20
+#ETA=0.4
+#EXP_PATH="exp/MyDARTS/hier_${ETA}_cifar100_seed${SEED}_${LOSS}${ALPHA}_${ARCH}_gpu${GPU}"
+#
+#python train.py --data cifar100 --batch_size 64 --gpu ${GPU} \
+#    --epochs ${EPOCHS} --save ${EXP_PATH} --seed ${SEED} --auxiliary --cutout \
+#    --dataset cifar100 --corruption_prob ${ETA} --corruption_type hierarchical --gold_fraction 0 --loss_func ${LOSS} \
+#    --arch ${ARCH} --alpha ${ALPHA} --train_portion 0.9 --layers ${LAYERS}
