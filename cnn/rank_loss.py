@@ -142,13 +142,13 @@ def main():
     sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[:split]),
     pin_memory=True, num_workers=2)
 
-  clean_train_list = []
-  for input, target in clean_train_queue:
-    clean_train_list.append((input, target))
-
-  noisy_train_list = []
-  for input, target in noisy_train_queue:
-    noisy_train_list.append((input, target))
+  # clean_train_list = []
+  # for input, target in clean_train_queue:
+  #   clean_train_list.append((input, target))
+  #
+  # noisy_train_list = []
+  # for input, target in noisy_train_queue:
+  #   noisy_train_list.append((input, target))
 
   clean_valid_queue = torch.utils.data.DataLoader(
     gold_train_data, batch_size=args.batch_size,
@@ -185,7 +185,7 @@ def main():
       model.drop_path_prob = args.drop_path_prob * epoch / args.epochs
 
       # train_queue = clean_train_queue if args.clean_train else noisy_train_queue
-      train_acc, train_obj, another_obj = train(clean_train_list, noisy_train_list, model, criterion, optimizer)
+      train_acc, train_obj, another_obj = train(clean_train_queue, noisy_train_queue, model, criterion, optimizer)
       if args.clean_train:
         logging.info('train_acc %f, clean_loss %f, noisy_loss %f', train_acc, train_obj, another_obj)
       else:
@@ -200,7 +200,7 @@ def main():
       # utils.save(model, os.path.join(args.save, 'weights.pt'))
 
 
-def train(clean_train_list, noisy_train_list, model, criterion, optimizer):
+def train(clean_train_queue, noisy_train_queue, model, criterion, optimizer):
   objs = utils.AvgrageMeter()
   another_objs = utils.AvgrageMeter()
   top1 = utils.AvgrageMeter()
@@ -208,14 +208,14 @@ def train(clean_train_list, noisy_train_list, model, criterion, optimizer):
   model.train()
 
   if args.clean_train:
-    train_list = clean_train_list
-    another_list = noisy_train_list
+    train_queue = clean_train_queue
+    another_queue = noisy_train_queue
   else:
-    train_list = noisy_train_list
-    another_list = clean_train_list
+    train_queue = noisy_train_queue
+    another_queue = clean_train_queue
 
-  for step, (input, target) in enumerate(train_list):
-    another_input, another_target = another_list[step]
+  for step, (input, target) in enumerate(train_queue):
+    another_input, another_target = next(iter(another_queue))
 
     input = Variable(input).cuda()
     target = Variable(target).cuda(async=True)
