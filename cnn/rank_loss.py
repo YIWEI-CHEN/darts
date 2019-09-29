@@ -191,11 +191,11 @@ def main():
       else:
         logging.info('train_acc %f, clean_loss %f, noisy_loss %f', train_acc, another_obj, train_obj)
 
-      # clean_valid_acc, valid_obj = infer_valid(clean_valid_queue, model, criterion)
-      # logging.info('clean_valid_acc %f', clean_valid_acc)
+      clean_valid_acc, clean_valid_obj = infer_valid(clean_valid_queue, model, criterion)
+      logging.info('clean_valid_acc %f, clean_valid_loss %f', clean_valid_acc, clean_valid_obj)
 
-      # noisy_valid_acc, valid_obj = infer_valid(noisy_valid_queue, model, criterion)
-      # logging.info('noisy_valid_acc %f', noisy_valid_acc)
+      noisy_valid_acc, noisy_valid_obj = infer_valid(noisy_valid_queue, model, criterion)
+      logging.info('noisy_valid_acc %f, noisy_valid_loss %f', noisy_valid_acc, noisy_valid_obj)
 
       # utils.save(model, os.path.join(args.save, 'weights.pt'))
 
