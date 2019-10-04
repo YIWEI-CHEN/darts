@@ -3,6 +3,7 @@ import sys
 import time
 import glob
 import numpy as np
+import random
 import torch
 import utils
 import logging
@@ -71,10 +72,11 @@ logging.getLogger().addHandler(fh)
 #   CIFAR_CLASSES = 100
 # else:
 CIFAR_CLASSES = 10
+gain = 1
 
 def weights_init(m):
   if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
-    torch.nn.init.xavier_uniform(m.weight)
+    torch.nn.init.xavier_uniform(m.weight, gain=gain)
     # if len(m.weight.data.shape) > 1:
     #   logging.info('{}, {}, {}'.format(m, m.weight.data.shape, m.weight.data[0][0]))
     # else:
@@ -87,12 +89,14 @@ def main():
 
   np.random.seed(args.seed)
   torch.cuda.set_device(args.gpu)
-  cudnn.benchmark = True
   torch.manual_seed(args.seed)
   cudnn.enabled=True
   torch.cuda.manual_seed(args.seed)
   logging.info('gpu device = %d' % args.gpu)
   logging.info("args = %s", args)
+  cudnn.benchmark = False
+  torch.backends.cudnn.deterministic = True
+  random.seed(args.seed)
 
   if args.arch == 'resnet':
     model = ResNet18(CIFAR_CLASSES).cuda()
@@ -172,32 +176,32 @@ def main():
   else:
     assert False, "Invalid loss function '{}' given. Must be in {'cce', 'rll'}".format(args.loss_func)
 
+  global gain
   for epoch in range(args.epochs):
     if args.random_weight:
-      logging.info('Randomly assign weights')
+      logging.info('Epoch %d, Randomly assign weights', epoch)
       model.drop_path_prob = args.drop_path_prob * epoch / args.epochs
-      torch.manual_seed(epoch)
-      clean_obj, noisy_obj = infer_random_weight(clean_train_list, noisy_train_list, model, criterion)
+      clean_obj, noisy_obj = infer_random_weight(clean_train_queue, noisy_train_queue, model, criterion)
       logging.info('clean loss %f, noisy loss %f', clean_obj, noisy_obj)
+      gain = np.random.randint(1, args.grad_clip, size=1)[0]
     else:
       scheduler.step()
       logging.info('epoch %d lr %e', epoch, scheduler.get_lr()[0])
       model.drop_path_prob = args.drop_path_prob * epoch / args.epochs
 
-      # train_queue = clean_train_queue if args.clean_train else noisy_train_queue
       train_acc, train_obj, another_obj = train(clean_train_queue, noisy_train_queue, model, criterion, optimizer)
       if args.clean_train:
         logging.info('train_acc %f, clean_loss %f, noisy_loss %f', train_acc, train_obj, another_obj)
       else:
         logging.info('train_acc %f, clean_loss %f, noisy_loss %f', train_acc, another_obj, train_obj)
 
-      clean_valid_acc, clean_valid_obj = infer_valid(clean_valid_queue, model, criterion)
-      logging.info('clean_valid_acc %f, clean_valid_loss %f', clean_valid_acc, clean_valid_obj)
+      utils.save(model, os.path.join(args.save, 'weights.pt'))
 
-      noisy_valid_acc, noisy_valid_obj = infer_valid(noisy_valid_queue, model, criterion)
-      logging.info('noisy_valid_acc %f, noisy_valid_loss %f', noisy_valid_acc, noisy_valid_obj)
+    clean_valid_acc, clean_valid_obj = infer_valid(clean_valid_queue, model, criterion)
+    logging.info('clean_valid_acc %f, clean_valid_loss %f', clean_valid_acc, clean_valid_obj)
 
-      # utils.save(model, os.path.join(args.save, 'weights.pt'))
+    noisy_valid_acc, noisy_valid_obj = infer_valid(noisy_valid_queue, model, criterion)
+    logging.info('noisy_valid_acc %f, noisy_valid_loss %f', noisy_valid_acc, noisy_valid_obj)
 
 
 def train(clean_train_queue, noisy_train_queue, model, criterion, optimizer):
@@ -257,21 +261,19 @@ def train(clean_train_queue, noisy_train_queue, model, criterion, optimizer):
 
   return top1.avg, objs.avg, another_objs.avg
 
-def infer_random_weight(clean_train_list, noisy_train_list, model, criterion):
+def infer_random_weight(clean_train_queue, noisy_train_queue, model, criterion):
   clean_objs = utils.AvgrageMeter()
   noisy_objs = utils.AvgrageMeter()
   model.train()
   model.apply(weights_init)
   nn.utils.clip_grad_norm(model.parameters(), args.grad_clip)
-  # model.eval()
+  model.eval()
 
-  total_batch = len(clean_train_list)
-  for step in range(total_batch):
-    for train_list, objs in [
-      (clean_train_list, clean_objs),
-      (noisy_train_list, noisy_objs),
-    ]:
-      input_, target_ = train_list[step]
+  for kind, objs, train_queue in [
+    ('clean', clean_objs, clean_train_queue),
+    ('noisy', noisy_objs, noisy_train_queue),
+  ]:
+    for step, (input_, target_) in enumerate(train_queue):
       input_ = Variable(input_).cuda()
       target_ = Variable(target_).cuda(async=True)
 
@@ -285,8 +287,8 @@ def infer_random_weight(clean_train_list, noisy_train_list, model, criterion):
       n = input_.size(0)
       objs.update(loss.data[0], n)
 
-    if step % args.report_freq == 0:
-        logging.info('step %03d clean loss %e, noisy loss %e', step, clean_objs.avg, noisy_objs.avg)
+      if step % args.report_freq == 0:
+          logging.info('step %03d %s loss %e', step, kind, objs.avg)
 
   return clean_objs.avg, noisy_objs.avg
 
