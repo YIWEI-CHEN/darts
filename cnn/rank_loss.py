@@ -148,10 +148,14 @@ def main():
 
   # clean_train_list = []
   # for input, target in clean_train_queue:
+  #   input = Variable(input).cuda()
+  #   target = Variable(target).cuda(async=True)
   #   clean_train_list.append((input, target))
   #
   # noisy_train_list = []
   # for input, target in noisy_train_queue:
+  #   input = Variable(input).cuda()
+  #   target = Variable(target).cuda(async=True)
   #   noisy_train_list.append((input, target))
 
   clean_valid_queue = torch.utils.data.DataLoader(
