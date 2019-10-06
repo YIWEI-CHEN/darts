@@ -56,7 +56,7 @@ parser.add_argument('--loss_func', type=str, default='cce', choices=['cce', 'rll
 parser.add_argument('--alpha', type=float, default=0.1, help='alpha for RLL')
 args = parser.parse_args()
 
-args.save = 'search-{}-{}'.format(args.save, time.strftime("%Y%m%d-%H%M%S"))
+args.save = 'eval-{}-{}'.format(args.save, time.strftime("%Y%m%d-%H%M%S"))
 utils.create_exp_dir(args.save, scripts_to_save=glob.glob('*.py'))
 
 log_format = '%(asctime)s %(message)s'
@@ -152,7 +152,7 @@ def main():
     pin_memory=True, num_workers=0)
 
   for epoch in range(args.epochs):
-    logging.info('Epoch %d lr, random architecture with fix weights')
+    logging.info('Epoch %d, random architecture with fix weights', epoch)
 
     genotype = model.genotype()
     logging.info('genotype = %s', genotype)
@@ -161,55 +161,29 @@ def main():
     logging.info(F.softmax(model.alphas_reduce, dim=-1))
 
     # training
-    clean_train_acc, clean_train_obj = train(clean_train_queue, model, criterion)
+    clean_train_acc, clean_train_obj = infer(clean_train_queue, model, criterion, kind='clean_train')
     logging.info('clean_train_acc %f, clean_train_loss %f', clean_train_acc, clean_train_obj)
 
-    noisy_train_acc, noisy_train_obj = train(noisy_train_queue, model, criterion)
+    noisy_train_acc, noisy_train_obj = infer(noisy_train_queue, model, criterion, kind='noisy_train')
     logging.info('noisy_train_acc %f, noisy_train_loss %f', noisy_train_acc, noisy_train_obj)
 
     # validation
-    clean_valid_acc, clean_valid_obj = infer(clean_valid_queue, model, criterion)
-    logging.info('clean_valid_acc %f, clean_valid_loss', clean_valid_acc, clean_valid_obj)
+    clean_valid_acc, clean_valid_obj = infer(clean_valid_queue, model, criterion, kind='clean_valid')
+    logging.info('clean_valid_acc %f, clean_valid_loss %f', clean_valid_acc, clean_valid_obj)
 
     # validation
-    noisy_valid_acc, noisy_valid_obj = infer(noisy_valid_queue, model, criterion)
-    logging.info('noisy_valid_acc %f, noisy_valid_loss', noisy_valid_acc, noisy_valid_obj)
+    noisy_valid_acc, noisy_valid_obj = infer(noisy_valid_queue, model, criterion, kind='noisy_valid')
+    logging.info('noisy_valid_acc %f, noisy_valid_loss %f', noisy_valid_acc, noisy_valid_obj)
 
     utils.save(model, os.path.join(args.save, 'weights.pt'))
 
     # Randomly change the alphas
     k = sum(1 for i in range(model._steps) for n in range(2 + i))
     num_ops = len(PRIMITIVES)
-    model.alphas_normal.data.copy_ = 1e-3 * torch.randn(k, num_ops)
-    model.alphas_reduce.data.copy_ = 1e-3 * torch.randn(k, num_ops)
+    model.alphas_normal.data.copy_(torch.randn(k, num_ops))
+    model.alphas_reduce.data.copy_(torch.randn(k, num_ops))
 
-
-def train(train_queue, model, criterion):
-  objs = utils.AvgrageMeter()
-  top1 = utils.AvgrageMeter()
-  top5 = utils.AvgrageMeter()
-  model.train()
-
-  for step, (input, target) in enumerate(train_queue):
-    input = Variable(input, requires_grad=False).cuda()
-    target = Variable(target, requires_grad=False).cuda(async=True)
-
-    logits = model(input)
-    loss = criterion(logits, target)
-
-    prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
-    n = input.size(0)
-    objs.update(loss.data[0], n)
-    top1.update(prec1.data[0], n)
-    top5.update(prec5.data[0], n)
-
-    if step % args.report_freq == 0:
-      logging.info('train %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)
-
-  return top1.avg, objs.avg
-
-
-def infer(valid_queue, model, criterion):
+def infer(valid_queue, model, criterion, kind):
   objs = utils.AvgrageMeter()
   top1 = utils.AvgrageMeter()
   top5 = utils.AvgrageMeter()
@@ -229,7 +203,7 @@ def infer(valid_queue, model, criterion):
     top5.update(prec5.data[0], n)
 
     if step % args.report_freq == 0:
-      logging.info('valid %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)
+      logging.info('%s %03d %e %f %f', kind, step, objs.avg, top1.avg, top5.avg)
 
   return top1.avg, objs.avg
 
