@@ -27,7 +27,7 @@ parser.add_argument('--batch_size', type=int, default=64, help='batch size')
 # parser.add_argument('--learning_rate_min', type=float, default=0.001, help='min learning rate')
 # parser.add_argument('--momentum', type=float, default=0.9, help='momentum')
 # parser.add_argument('--weight_decay', type=float, default=3e-4, help='weight decay')
-parser.add_argument('--report_freq', type=float, default=50, help='report frequency')
+parser.add_argument('--report_freq', type=float, default=20, help='report frequency')
 parser.add_argument('--gpu', type=int, default=0, help='gpu device id')
 parser.add_argument('--epochs', type=int, default=50, help='num of training epochs')
 parser.add_argument('--init_channels', type=int, default=16, help='num of init channels')
@@ -151,6 +151,18 @@ def main():
     sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[split:]),
     pin_memory=True, num_workers=0)
 
+  clean_train_list, clean_valid_list, noisy_train_list, noisy_valid_list = [], [], [], []
+  for dst_list, queue in [
+    (clean_train_list, clean_train_queue),
+    (clean_valid_list, clean_valid_queue),
+    (noisy_train_list, noisy_train_queue),
+    (noisy_valid_list, noisy_valid_queue),
+  ]:
+    for input, target in queue:
+      input = Variable(input, volatile=True).cuda()
+      target = Variable(target, volatile=True).cuda(async=True)
+      dst_list.append((input, target))
+
   for epoch in range(args.epochs):
     logging.info('Epoch %d, random architecture with fix weights', epoch)
 
@@ -161,18 +173,17 @@ def main():
     logging.info(F.softmax(model.alphas_reduce, dim=-1))
 
     # training
-    clean_train_acc, clean_train_obj = infer(clean_train_queue, model, criterion, kind='clean_train')
+    clean_train_acc, clean_train_obj = infer(clean_train_list, model, criterion, kind='clean_train')
     logging.info('clean_train_acc %f, clean_train_loss %f', clean_train_acc, clean_train_obj)
 
-    noisy_train_acc, noisy_train_obj = infer(noisy_train_queue, model, criterion, kind='noisy_train')
+    noisy_train_acc, noisy_train_obj = infer(noisy_train_list, model, criterion, kind='noisy_train')
     logging.info('noisy_train_acc %f, noisy_train_loss %f', noisy_train_acc, noisy_train_obj)
 
     # validation
-    clean_valid_acc, clean_valid_obj = infer(clean_valid_queue, model, criterion, kind='clean_valid')
+    clean_valid_acc, clean_valid_obj = infer(clean_valid_list, model, criterion, kind='clean_valid')
     logging.info('clean_valid_acc %f, clean_valid_loss %f', clean_valid_acc, clean_valid_obj)
 
-    # validation
-    noisy_valid_acc, noisy_valid_obj = infer(noisy_valid_queue, model, criterion, kind='noisy_valid')
+    noisy_valid_acc, noisy_valid_obj = infer(noisy_valid_list, model, criterion, kind='noisy_valid')
     logging.info('noisy_valid_acc %f, noisy_valid_loss %f', noisy_valid_acc, noisy_valid_obj)
 
     utils.save(model, os.path.join(args.save, 'weights.pt'))
@@ -183,16 +194,13 @@ def main():
     model.alphas_normal.data.copy_(torch.randn(k, num_ops))
     model.alphas_reduce.data.copy_(torch.randn(k, num_ops))
 
-def infer(valid_queue, model, criterion, kind):
+def infer(valid_list, model, criterion, kind):
   objs = utils.AvgrageMeter()
   top1 = utils.AvgrageMeter()
   top5 = utils.AvgrageMeter()
   model.eval()
 
-  for step, (input, target) in enumerate(valid_queue):
-    input = Variable(input, volatile=True).cuda()
-    target = Variable(target, volatile=True).cuda(async=True)
-
+  for step, (input, target) in enumerate(valid_list):
     logits = model(input)
     loss = criterion(logits, target)
 
