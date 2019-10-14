@@ -110,58 +110,45 @@ def main():
 
   # Load dataset
   if args.dataset == 'cifar10':
-    if args.gold_fraction == 0:
-      train_data = CIFAR10(
-        root=args.data, train=True, gold=False, gold_fraction=args.gold_fraction,
-        corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
-        transform=train_transform, download=True, seed=args.seed)
-      if args.clean_valid:
-        gold_train_data = CIFAR10(
-          root=args.data, train=True, gold=True, gold_fraction=1.0,
-          corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
-          transform=train_transform, download=True, seed=args.seed)
-    else:
-      train_data = CIFAR10(
-        root=args.data, train=True, gold=True, gold_fraction=args.gold_fraction,
-        corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
-        transform=train_transform, download=True, seed=args.seed)
-      gold_train_data = train_data
+    noisy_train_data = CIFAR10(
+      root=args.data, train=True, gold=False, gold_fraction=0.0,
+      corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
+      transform=train_transform, download=True, seed=args.seed)
+    gold_train_data = CIFAR10(
+      root=args.data, train=True, gold=True, gold_fraction=1.0,
+      corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
+      transform=train_transform, download=True, seed=args.seed)
   elif args.dataset == 'cifar100':
-    if args.gold_fraction == 0:
-      train_data = CIFAR100(
-        root=args.data, train=True, gold=False, gold_fraction=args.gold_fraction,
-        corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
-        transform=train_transform, download=True, seed=args.seed)
-      if args.clean_valid:
-        gold_train_data = CIFAR100(
-          root=args.data, train=True, gold=True, gold_fraction=1.0,
-          corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
-          transform=train_transform, download=True, seed=args.seed)
-    else:
-      train_data = CIFAR100(
-        root=args.data, train=True, gold=True, gold_fraction=args.gold_fraction,
-        corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
-        transform=train_transform, download=True, seed=args.seed)
-      gold_train_data = train_data
-  num_train = len(train_data)
+    noisy_train_data = CIFAR100(
+      root=args.data, train=True, gold=False, gold_fraction=0.0,
+      corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
+      transform=train_transform, download=True, seed=args.seed)
+    gold_train_data = CIFAR100(
+      root=args.data, train=True, gold=True, gold_fraction=1.0,
+      corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
+      transform=train_transform, download=True, seed=args.seed)
+  num_train = len(gold_train_data)
   indices = list(range(num_train))
   split = int(np.floor(args.train_portion * num_train))
 
+  if args.gold_fraction == 1.0:
+    train_data = gold_train_data
+  else:
+    train_data = noisy_train_data
   train_queue = torch.utils.data.DataLoader(
       train_data, batch_size=args.batch_size,
       sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[:split]),
-      pin_memory=True, num_workers=2)
+      pin_memory=True, num_workers=0)
 
   if args.clean_valid:
-    valid_queue = torch.utils.data.DataLoader(
-      gold_train_data, batch_size=args.batch_size,
-      sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[split:]),
-      pin_memory=True, num_workers=2)
+    valid_data = gold_train_data
   else:
-    valid_queue = torch.utils.data.DataLoader(
-      train_data, batch_size=args.batch_size,
-      sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[split:]),
-      pin_memory=True, num_workers=2)
+    valid_data = noisy_train_data
+
+  valid_queue = torch.utils.data.DataLoader(
+    valid_data, batch_size=args.batch_size,
+    sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[split:]),
+    pin_memory=True, num_workers=0)
 
   scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         optimizer, float(args.epochs), eta_min=args.learning_rate_min)

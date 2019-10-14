@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 DATE=`date +%m%d`
-SEED=1
+SEED=2019
 
 #LOSS="cce"
 #EXP_PATH="exp/cifar10_${LOSS}_no_noise_gpu"
@@ -48,7 +48,7 @@ SEED=1
 
 #LOSS="rll"
 #ALPHA=0.01
-#ETA=0.4
+#ETA=0.6
 #EXP_PATH="exp/hier${ETA}_cifar100_seed${SEED}_${LOSS}${ALPHA}_gpu"
 #GPU="2"
 #python train_search.py --data cifar100 --batch_size 64 --gpu ${GPU} \
@@ -56,11 +56,20 @@ SEED=1
 #    --corruption_prob ${ETA} --corruption_type hierarchical --gold_fraction 0 --loss_func ${LOSS} \
 #    --alpha ${ALPHA} --unrolled
 
+#LOSS="cce"
+#ETA=0.6
+#EXP_PATH="exp/hier${ETA}_cifar100_seed${SEED}_${LOSS}_gpu"
+#GPU="3"
+#python train_search.py --data cifar100 --batch_size 64 --gpu ${GPU} \
+#    --dataset cifar100 --save ${EXP_PATH} --seed ${SEED} --train_portion 0.9 \
+#    --corruption_prob ${ETA} --corruption_type hierarchical --gold_fraction 0 --loss_func ${LOSS} \
+#    --unrolled
+
 LOSS="cce"
-ETA=0.4
-EXP_PATH="exp/hier${ETA}_cifar100_seed${SEED}_${LOSS}_gpu"
-GPU="3"
-python train_search.py --data cifar100 --batch_size 64 --gpu ${GPU} \
-    --dataset cifar100 --save ${EXP_PATH} --seed ${SEED} --train_portion 0.9 \
-    --corruption_prob ${ETA} --corruption_type hierarchical --gold_fraction 0 --loss_func ${LOSS} \
-    --unrolled
+ETA=0.6
+GPU="2"
+EXP_PATH="exp/unif${ETA}_cifar10_seed${SEED}_clean_valid_${LOSS}_gpu${GPU}"
+python train_search.py --data /home/yiwei/cifar10 --batch_size 64 --gpu ${GPU} \
+    --save ${EXP_PATH} --seed ${SEED} --train_portion 0.9 \
+    --corruption_prob ${ETA} --corruption_type unif --gold_fraction 0.0 --loss_func ${LOSS} \
+    --clean_valid --unrolled
