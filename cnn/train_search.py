@@ -3,6 +3,7 @@ import sys
 import time
 import glob
 import numpy as np
+import random
 import torch
 import utils
 import logging
@@ -77,11 +78,13 @@ def main():
     logging.info('no gpu device available')
     sys.exit(1)
 
+  random.seed(args.seed)
   np.random.seed(args.seed)
   torch.cuda.set_device(args.gpu)
-  cudnn.benchmark = True
+  cudnn.benchmark = False
   torch.manual_seed(args.seed)
   cudnn.enabled = True
+  cudnn.deterministic = True
   torch.cuda.manual_seed(args.seed)
   logging.info('gpu device = %d' % args.gpu)
   logging.info("args = %s", args)
