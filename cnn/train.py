@@ -123,6 +123,7 @@ def main():
       root=args.data, train=True, gold=True, gold_fraction=1.0,
       corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
       transform=train_transform, download=True, seed=args.seed)
+    test_data = dset.CIFAR10(root=args.data, train=False, download=True, transform=test_transform)
   elif args.dataset == 'cifar100':
     noisy_train_data = CIFAR100(
       root=args.data, train=True, gold=False, gold_fraction=0.0,
@@ -132,6 +133,7 @@ def main():
       root=args.data, train=True, gold=True, gold_fraction=1.0,
       corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
       transform=train_transform, download=True, seed=args.seed)
+    test_data = dset.CIFAR100(root=args.data, train=False, download=True, transform=test_transform)
 
   num_train = len(gold_train_data)
   indices = list(range(num_train))
