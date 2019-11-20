@@ -38,7 +38,7 @@ parser.add_argument('--cutout', action='store_true', default=False, help='use cu
 parser.add_argument('--cutout_length', type=int, default=16, help='cutout length')
 parser.add_argument('--drop_path_prob', type=float, default=0.2, help='drop path probability')
 parser.add_argument('--save', type=str, default='EXP', help='experiment name')
-parser.add_argument('--seed', type=int, default=0, help='random seed')
+parser.add_argument('--seed', type=int, default=0, help='random seed for parameters')
 parser.add_argument('--arch', type=str, default='DARTS', help='which architecture to use')
 parser.add_argument('--grad_clip', type=float, default=5, help='gradient clipping')
 parser.add_argument('--dataset', type=str, default='cifar10', choices=['cifar10', 'cifar100'],
@@ -53,6 +53,7 @@ parser.add_argument('--loss_func', type=str, default='cce', choices=['cce', 'rll
 parser.add_argument('--alpha', type=float, default=0.1, help='alpha for RLL')
 parser.add_argument('--train_portion', type=float, default=0.5, help='portion of training data')
 parser.add_argument('--clean_valid', action='store_true', default=False, help='use clean validation')
+parser.add_argument('--data_seed', type=int, default=1, help='random seed for label noise')
 args = parser.parse_args()
 
 args.save = 'eval-{}-{}'.format(args.save, time.strftime("%Y%m%d-%H%M%S"))
@@ -78,7 +79,7 @@ def main():
     sys.exit(1)
 
   random.seed(args.seed)
-  np.random.seed(args.seed)
+  np.random.seed(args.data_seed)  # cutout and load_corrupted_data use np.random
   torch.cuda.set_device(args.gpu)
   cudnn.benchmark = False
   torch.manual_seed(args.seed)
@@ -118,21 +119,21 @@ def main():
     noisy_train_data = CIFAR10(
       root=args.data, train=True, gold=False, gold_fraction=0.0,
       corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
-      transform=train_transform, download=True, seed=args.seed)
+      transform=train_transform, download=True, seed=args.data_seed)
     gold_train_data = CIFAR10(
       root=args.data, train=True, gold=True, gold_fraction=1.0,
       corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
-      transform=train_transform, download=True, seed=args.seed)
+      transform=train_transform, download=True, seed=args.data_seed)
     test_data = dset.CIFAR10(root=args.data, train=False, download=True, transform=test_transform)
   elif args.dataset == 'cifar100':
     noisy_train_data = CIFAR100(
       root=args.data, train=True, gold=False, gold_fraction=0.0,
       corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
-      transform=train_transform, download=True, seed=args.seed)
+      transform=train_transform, download=True, seed=args.data_seed)
     gold_train_data = CIFAR100(
       root=args.data, train=True, gold=True, gold_fraction=1.0,
       corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
-      transform=train_transform, download=True, seed=args.seed)
+      transform=train_transform, download=True, seed=args.data_seed)
     test_data = dset.CIFAR100(root=args.data, train=False, download=True, transform=test_transform)
 
   num_train = len(gold_train_data)
