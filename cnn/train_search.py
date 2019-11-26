@@ -53,6 +53,7 @@ parser.add_argument('--loss_func', type=str, default='cce', choices=['cce', 'rll
                     help='Choose between Categorical Cross Entropy (CCE), Robust Log Loss (RLL).')
 parser.add_argument('--clean_valid', action='store_true', default=False, help='use clean validation')
 parser.add_argument('--alpha', type=float, default=0.1, help='alpha for RLL')
+parser.add_argument('--data_seed', type=int, default=1, help='random seed for label noise')
 args = parser.parse_args()
 
 args.save = 'search-{}-{}'.format(args.save, time.strftime("%Y%m%d-%H%M%S"))
@@ -79,7 +80,7 @@ def main():
     sys.exit(1)
 
   random.seed(args.seed)
-  np.random.seed(args.seed)
+  np.random.seed(args.data_seed)  # cutout and load_corrupted_data use np.random
   torch.cuda.set_device(args.gpu)
   cudnn.benchmark = False
   torch.manual_seed(args.seed)
@@ -113,20 +114,20 @@ def main():
     noisy_train_data = CIFAR10(
       root=args.data, train=True, gold=False, gold_fraction=0.0,
       corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
-      transform=train_transform, download=True, seed=args.seed)
+      transform=train_transform, download=True, seed=args.data_seed)
     gold_train_data = CIFAR10(
       root=args.data, train=True, gold=True, gold_fraction=1.0,
       corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
-      transform=train_transform, download=True, seed=args.seed)
+      transform=train_transform, download=True, seed=args.data_seed)
   elif args.dataset == 'cifar100':
     noisy_train_data = CIFAR100(
       root=args.data, train=True, gold=False, gold_fraction=0.0,
       corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
-      transform=train_transform, download=True, seed=args.seed)
+      transform=train_transform, download=True, seed=args.data_seed)
     gold_train_data = CIFAR100(
       root=args.data, train=True, gold=True, gold_fraction=1.0,
       corruption_prob=args.corruption_prob, corruption_type=args.corruption_type,
-      transform=train_transform, download=True, seed=args.seed)
+      transform=train_transform, download=True, seed=args.data_seed)
   num_train = len(gold_train_data)
   indices = list(range(num_train))
   split = int(np.floor(args.train_portion * num_train))
