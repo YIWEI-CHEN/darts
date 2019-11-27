@@ -51,6 +51,8 @@ parser.add_argument('--corruption_type', '-ctype', type=str, default='unif',
 parser.add_argument('--time_limit', type=int, default=12*60*60, help='Time limit for search')
 parser.add_argument('--loss_func', type=str, default='cce', choices=['cce', 'rll'],
                     help='Choose between Categorical Cross Entropy (CCE), Robust Log Loss (RLL).')
+parser.add_argument('--valid_loss_func', type=str, default='none', choices=['cce', 'rll', 'none'],
+                    help='Choose between Categorical Cross Entropy (CCE), Robust Log Loss (RLL).')
 parser.add_argument('--clean_valid', action='store_true', default=False, help='use clean validation')
 parser.add_argument('--alpha', type=float, default=0.1, help='alpha for RLL')
 parser.add_argument('--data_seed', type=int, default=1, help='random seed for label noise')
@@ -97,7 +99,14 @@ def main():
   else:
     assert False, "Invalid loss function '{}' given. Must be in {'cce', 'rll'}".format(args.loss_func)
 
-  model = Network(args.init_channels, CIFAR_CLASSES, args.layers, criterion)
+  if args.valid_loss_func == 'cce':
+    valid_criterion = nn.CrossEntropyLoss().cuda()
+  elif args.valid_loss_func == 'rll':
+    valid_criterion = utils.RobustLogLoss(alpha=args.alpha).cuda()
+  else:
+    valid_criterion = None
+
+  model = Network(args.init_channels, CIFAR_CLASSES, args.layers, criterion, valid_criterion)
   model = model.cuda()
   logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
 

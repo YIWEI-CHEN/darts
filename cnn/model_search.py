@@ -60,12 +60,14 @@ class Cell(nn.Module):
 
 class Network(nn.Module):
 
-  def __init__(self, C, num_classes, layers, criterion, steps=4, multiplier=4, stem_multiplier=3):
+  def __init__(self, C, num_classes, layers, criterion, _validation_criterion=None,
+               steps=4, multiplier=4, stem_multiplier=3):
     super(Network, self).__init__()
     self._C = C
     self._num_classes = num_classes
     self._layers = layers
     self._criterion = criterion
+    self._validation_criterion = criterion if _validation_criterion is None else _validation_criterion
     self._steps = steps
     self._multiplier = multiplier
 
@@ -95,7 +97,7 @@ class Network(nn.Module):
     self._initialize_alphas()
 
   def new(self):
-    model_new = Network(self._C, self._num_classes, self._layers, self._criterion).cuda()
+    model_new = Network(self._C, self._num_classes, self._layers, self._criterion, self._validation_criterion).cuda()
     for x, y in zip(model_new.arch_parameters(), self.arch_parameters()):
         x.data.copy_(y.data)
     return model_new
@@ -114,7 +116,11 @@ class Network(nn.Module):
 
   def _loss(self, input, target):
     logits = self(input)
-    return self._criterion(logits, target) 
+    return self._criterion(logits, target)
+
+  def _validation_loss(self, input, target):
+    logits = self(input)
+    return self._validation_criterion(logits, target)
 
   def _initialize_alphas(self):
     k = sum(1 for i in range(self._steps) for n in range(2+i))
