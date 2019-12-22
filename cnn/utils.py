@@ -223,7 +223,7 @@ def infer(queue, model, criterion, args):
     return top1.avg, objs.avg
 
 
-def get_train_validation_loader(args):
+def get_train_validation_loader(args, distributed=True):
     train_transform, valid_transform = _data_transforms_cifar10(args)
     train_data = dset.CIFAR10(root=args.data, train=True, download=True, transform=train_transform)
 
@@ -232,8 +232,11 @@ def get_train_validation_loader(args):
     split = int(np.floor(args.train_portion * num_train))
 
     # train[0:split] as training data
-    train_sampler = DistributedSubsetSampler(train_data)
-    train_sampler.set_split(split)
+    if distributed:
+        train_sampler = DistributedSubsetSampler(train_data)
+        train_sampler.set_split(split)
+    else:
+        train_sampler = torch.utils.data.sampler.SubsetRandomSampler(indices[:split])
     train_queue = torch.utils.data.DataLoader(
         train_data, batch_size=args.batch_size,
         num_workers=args.workers, pin_memory=True, sampler=train_sampler)
