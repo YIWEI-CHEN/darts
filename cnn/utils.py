@@ -1,5 +1,7 @@
 import logging
+import multiprocessing
 import sys
+import threading
 
 import random
 
@@ -192,7 +194,7 @@ def train(train_queue, model, criterion, optimizer, args):
   return top1.avg, objs.avg
 
 
-def infer(queue, model, criterion, args):
+def infer(queue, model, criterion, args, search=False):
   root = logging.getLogger()
   objs = AvgrageMeter()
   top1 = AvgrageMeter()
@@ -207,7 +209,10 @@ def infer(queue, model, criterion, args):
       target = target.cuda(args.gpu, non_blocking=True)
 
       # compute output
-      logits, _ = model(input)
+      if search:
+        logits = model(input)
+      else:
+        logits, _ = model(input)
       loss = criterion(logits, target)
 
       # measure accuracy and record loss
@@ -219,6 +224,51 @@ def infer(queue, model, criterion, args):
 
       if step % args.report_freq == 0:
         root.info('%s %03d %e %f %f', queue.name, step, objs.avg, top1.avg, top5.avg)
+
+    return top1.avg, objs.avg
+
+
+def search_train(train_queue, valid_queue, model, architect, criterion, optimizer, lr, args):
+    root = logging.getLogger()
+    objs = AvgrageMeter()
+    top1 = AvgrageMeter()
+    top5 = AvgrageMeter()
+
+    for step, (input, target) in enumerate(train_queue):
+        # switch to train mode
+        model.train()
+        n = input.size(0)
+
+        input = input.cuda(args.gpu, non_blocking=True)
+        target = target.cuda(args.gpu, non_blocking=True)
+
+        # get a random minibatch from the search queue with replacement
+        input_search, target_search = next(iter(valid_queue))
+        input_search = input_search.cuda(args.gpu, non_blocking=True)
+        target_search = target_search.cuda(args.gpu, non_blocking=True)
+
+        # search architecture
+        architect.step(input, target, input_search, target_search, lr, optimizer, unrolled=args.unrolled)
+
+        # compute output
+        logits = model(input)
+        loss = criterion(logits, target)
+
+        # compute gradient and do SGD step
+        optimizer.zero_grad()
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
+        optimizer.step()
+
+        # measure accuracy and record loss
+        prec1, prec5 = accuracy(logits, target, topk=(1, 5))
+        objs.update(loss.data.item(), n)
+        top1.update(prec1.data.item(), n)
+        top5.update(prec5.data.item(), n)
+
+        if step % args.report_freq == 0:
+            root.info('train %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)
+        break
 
     return top1.avg, objs.avg
 
@@ -241,8 +291,9 @@ def get_train_validation_loader(args, distributed=True):
         train_data, batch_size=args.batch_size,
         num_workers=args.workers, pin_memory=True, sampler=train_sampler)
 
-    # train[0:split] as validation data
-    valid_sampler = SubsetSampler(indices[split:])
+    # train[split:] as validation data
+    valid_sampler = torch.utils.data.sampler.SubsetRandomSampler(indices[split:])
+    # valid_sampler = SubsetSampler(indices[split:])
     valid_queue = torch.utils.data.DataLoader(
         train_data, batch_size=args.batch_size,
         num_workers=args.workers, pin_memory=True, sampler=valid_sampler)
@@ -258,3 +309,20 @@ def get_test_loader(args):
         test_data, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=args.workers)
     test_queue.name = 'test'
     return test_queue
+
+
+def run_log_thread():
+    log_queue = multiprocessing.get_context('spawn').Queue()
+
+    def _handle_log():
+        while True:
+            record = log_queue.get()
+            if record is None:
+                break
+            logger = logging.getLogger(record.name)
+            logger.handle(record)
+
+    log_thread = threading.Thread(target=_handle_log, name='log_thread')
+    log_thread.start()
+
+    return log_thread, log_queue
