@@ -268,7 +268,6 @@ def search_train(train_queue, valid_queue, model, architect, criterion, optimize
 
         if step % args.report_freq == 0:
             root.info('train %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)
-        break
 
     return top1.avg, objs.avg
 
