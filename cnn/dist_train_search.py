@@ -71,9 +71,6 @@ def main():
       root.info('no gpu device available')
       sys.exit(1)
 
-    # Fix seed
-    utils.fix_seed(args.seed)
-
     # Log thread to receive log from child processes
     log_thread, log_queue = utils.run_log_thread()
 
@@ -101,6 +98,9 @@ def main_worker(gpu, ngpus_per_node, args, log_queue):
 
   args.gpu = gpu
   global best_acc1
+
+  # Fix seed
+  utils.fix_seed(args.seed)
 
   try:
     # For multiprocessing distributed training, rank needs to be the
