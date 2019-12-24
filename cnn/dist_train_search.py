@@ -113,7 +113,7 @@ def main_worker(gpu, ngpus_per_node, args, log_queue):
     criterion = nn.CrossEntropyLoss().cuda(args.gpu)
 
     # create model
-    model = Network(args.init_channels, CIFAR_CLASSES, args.layers, criterion)
+    model = Network(args.init_channels, CIFAR_CLASSES, args.layers, criterion, args=args)
     root.info("param size = %fMB", utils.count_parameters_in_MB(model))
 
     # For multiprocessing distributed, DistributedDataParallel constructor
